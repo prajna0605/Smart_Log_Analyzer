@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  log-analyzer:
+    build: .
+    container_name: smart_log_analyzer
+    ports:
+      - "8000:8000"
+      - "8501:8501"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - ./data:/app/data
+      - ./temp:/app/temp
+    restart: unless-stopped
