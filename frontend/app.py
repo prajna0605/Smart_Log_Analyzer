@@ -82,8 +82,10 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+import os
+
 # Configuration backend URL
-API_URL = "http://127.0.0.1:8000"
+API_URL = os.environ.get("API_URL", "http://127.0.0.1:8000")
 
 st.title("🛡️ Smart Log Analyzer & Anomaly Detector")
 st.markdown("Automated log parsing, rule-based anomaly detection, and intelligent Gemini root-cause insights.")
