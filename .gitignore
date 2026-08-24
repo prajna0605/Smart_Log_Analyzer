@@ -1,0 +1,33 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables & secrets (CRITICAL: Do NOT push API keys)
+.env
+.env.local
+.env.*
+
+# Databases & local state
+*.db
+*.sqlite3
+smart_logs.db
+
+# Temporary files & uploaded datasets
+temp/
+scratch/
+.pytest_cache/
+.streamlit/
+*.log
+
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
