@@ -50,58 +50,52 @@ def run_anomaly_detector(db: Session):
     for entry in valid_entries:
         source_logs.setdefault(entry.source, []).append(entry)
     
-    # Identify burst entries
+    # Identify burst entries using two-pointer sliding window O(N log N)
     burst_entry_ids = set()
     for logs in source_logs.values():
-        # Sort logs by timestamp
         logs.sort(key=lambda x: x.timestamp)
-        for i, entry in enumerate(logs):
-            # count how many logs from this source occur within [entry.timestamp, entry.timestamp + BURST_WINDOW_SECONDS]
-            window_end = entry.timestamp + timedelta(seconds=BURST_WINDOW_SECONDS)
-            count = 0
-            for j in range(i, len(logs)):
-                if logs[j].timestamp <= window_end:
-                    count += 1
-                else:
-                    break
-            if count >= BURST_THRESHOLD_COUNT:
-                # Flag all entries in this window as part of a burst anomaly
-                for k in range(i, i + count):
+        left = 0
+        for right in range(len(logs)):
+            while (logs[right].timestamp - logs[left].timestamp).total_seconds() > BURST_WINDOW_SECONDS:
+                left += 1
+            if (right - left + 1) >= BURST_THRESHOLD_COUNT:
+                for k in range(left, right + 1):
                     burst_entry_ids.add(logs[k].id)
 
-    # Batch query existing flags to prevent N+1 queries
+    # Batch query existing flags to prevent duplicate flagging
     existing_flags_all = db.query(FlaggedEntry).all()
     existing_rules_map = {}
     for f in existing_flags_all:
         existing_rules_map.setdefault(f.log_entry_id, set()).add(f.detector_rule)
 
+    new_flags = []
     # Apply rules and write FlaggedEntry records
     for entry in valid_entries:
-        existing_rules = existing_rules_map.get(entry.id, set())
+        existing_rules = existing_rules_map.setdefault(entry.id, set())
 
         # Rule 1: Severity-based (Critical auto-flags)
         if entry.severity in CRITICAL_SEVERITIES:
             rule_name = "SEVERITY_SPIKE"
             if rule_name not in existing_rules:
-                flag = FlaggedEntry(
+                existing_rules.add(rule_name)
+                new_flags.append(FlaggedEntry(
                     log_entry_id=entry.id,
                     score=1.0,
                     reason=f"Severity of log is {entry.severity}, indicating critical system issue.",
                     detector_rule=rule_name
-                )
-                db.add(flag)
+                ))
 
         # Rule 2: Request Burst/Frequency
         if entry.id in burst_entry_ids:
             rule_name = "REQUEST_BURST"
             if rule_name not in existing_rules:
-                flag = FlaggedEntry(
+                existing_rules.add(rule_name)
+                new_flags.append(FlaggedEntry(
                     log_entry_id=entry.id,
                     score=0.9,
                     reason=f"Source {entry.source} generated multiple requests within a 60-second window, exceeding the threshold of {BURST_THRESHOLD_COUNT} requests.",
                     detector_rule=rule_name
-                )
-                db.add(flag)
+                ))
 
         # Rule 3: Off-pattern Access (Sensitive paths or event types during off-hours 10 PM - 5 AM)
         hour = entry.timestamp.hour
@@ -109,25 +103,28 @@ def run_anomaly_detector(db: Session):
         if entry.event_type in SENSITIVE_EVENT_TYPES and is_off_hours:
             rule_name = "OFF_HOURS_SENSITIVE_ACCESS"
             if rule_name not in existing_rules:
-                flag = FlaggedEntry(
+                existing_rules.add(rule_name)
+                new_flags.append(FlaggedEntry(
                     log_entry_id=entry.id,
                     score=0.85,
                     reason=f"Sensitive event '{entry.event_type}' was performed at {entry.timestamp.time()} (off-hours).",
                     detector_rule=rule_name
-                )
-                db.add(flag)
+                ))
 
         # Rule 4: Rare Event Type
         if entry.event_type in rare_event_types:
             rule_name = "RARE_EVENT_TYPE"
             if rule_name not in existing_rules:
+                existing_rules.add(rule_name)
                 freq_pct = (event_counts[entry.event_type] / total_valid) * 100
-                flag = FlaggedEntry(
+                new_flags.append(FlaggedEntry(
                     log_entry_id=entry.id,
                     score=0.75,
                     reason=f"Event type '{entry.event_type}' occurred rarely in dataset ({freq_pct:.2f}% frequency).",
                     detector_rule=rule_name
-                )
-                db.add(flag)
+                ))
 
-    db.commit()
+    if new_flags:
+        db.add_all(new_flags)
+        db.commit()
+

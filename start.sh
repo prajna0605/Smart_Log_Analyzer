@@ -7,19 +7,9 @@ if [ ! -f "data/logs.csv" ]; then
     python backend/synthesizer.py
 fi
 
-# Use PORT assigned by Render/Cloud environment, fallback to 8501
-PORT="${PORT:-8501}"
+# Use PORT assigned by Render/Cloud environment, fallback to 8000
+PORT="${PORT:-8000}"
 
-echo "Starting FastAPI Backend Server on port 8000..."
-python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 &
+echo "Starting Unified Smart Log Analyzer Web Application on port $PORT..."
+exec python -m uvicorn backend.main:app --host 0.0.0.0 --port "$PORT"
 
-echo "Waiting for backend startup..."
-sleep 3
-
-echo "Starting Streamlit Frontend Dashboard on port $PORT..."
-exec streamlit run frontend/app.py \
-    --server.port "$PORT" \
-    --server.address 0.0.0.0 \
-    --server.headless true \
-    --server.enableCORS false \
-    --server.enableXsrfProtection false

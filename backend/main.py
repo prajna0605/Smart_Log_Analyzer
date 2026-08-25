@@ -14,6 +14,8 @@ from .ingester import ingest_csv_logs
 from .models import FlaggedEntry, IngestionSummary, LogEntry
 from .schemas import FlaggedEntryResponse, IngestionSummaryResponse, LogEntryResponse
 
+from fastapi.staticfiles import StaticFiles
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -79,8 +81,6 @@ def get_flagged(db: Session = Depends(get_db)):
     """Retrieves all flagged anomalies."""
     return db.query(FlaggedEntry).order_by(FlaggedEntry.score.desc()).all()
 
-
-
 @app.post("/analyze-all-anomalies", response_model=list[FlaggedEntryResponse])
 def analyze_all_anomalies(db: Session = Depends(get_db)):
     """Triggers batch Gemini AI explanation for all unanalyzed flagged anomalies in 1 single API call."""
@@ -112,3 +112,8 @@ def clear_database(db: Session = Depends(get_db)):
     db.query(IngestionSummary).delete()
     db.commit()
     return {"message": "Database wiped successfully"}
+
+# Mount frontend static files (HTML/CSS/JS) at root
+if os.path.exists("frontend"):
+    app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
+

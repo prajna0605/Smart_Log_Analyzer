@@ -40,7 +40,7 @@ class FlaggedEntry(Base):
     detector_rule = Column(String, nullable=False)
     ai_explanation = Column(Text, nullable=True)
     ai_root_cause = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None))
 
     log_entry = relationship("LogEntry", back_populates="flagged_entries")
 
@@ -54,4 +54,5 @@ class IngestionSummary(Base):
     loaded_rows = Column(Integer, default=0)
     rejected_rows = Column(Integer, default=0)
     rejected_details = Column(Text, nullable=True)  # JSON or newline-separated error details
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None))
+

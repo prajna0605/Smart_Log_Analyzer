@@ -1,6 +1,6 @@
 import csv
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -37,17 +37,17 @@ def extract_row_fields(row: dict):
     severity = ""
     raw_message = ""
 
-    # Search by alias dictionaries
+    # Search by alias dictionaries with independent checks
     for k, v in norm_row.items():
         if not raw_timestamp and k in TIMESTAMP_ALIASES:
             raw_timestamp = v
-        elif not raw_source and k in SOURCE_ALIASES:
+        if not raw_source and k in SOURCE_ALIASES:
             raw_source = v
-        elif not event_type and k in EVENT_TYPE_ALIASES:
+        if not event_type and k in EVENT_TYPE_ALIASES:
             event_type = v
-        elif not severity and k in SEVERITY_ALIASES:
+        if not severity and k in SEVERITY_ALIASES:
             severity = map_severity_value(v)
-        elif not raw_message and k in RAW_MESSAGE_ALIASES:
+        if not raw_message and k in RAW_MESSAGE_ALIASES:
             raw_message = v
 
     # Build a combined raw message containing all key-values for full traceability
@@ -71,6 +71,7 @@ def ingest_csv_logs(file_path: str, filename: str, db: Session) -> IngestionSumm
     loaded_rows = 0
     rejected_rows = 0
     rejected_details = []
+    log_entries = []
 
     with open(file_path, mode="r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
@@ -102,7 +103,7 @@ def ingest_csv_logs(file_path: str, filename: str, db: Session) -> IngestionSumm
             err_msg = "; ".join(validation_errors) if not is_valid else None
 
             # If not parseable timestamp, assign current timestamp so we can save it in DB
-            db_timestamp = parsed_timestamp if parsed_timestamp else datetime.utcnow()  # noqa: DTZ003
+            db_timestamp = parsed_timestamp if parsed_timestamp else datetime.now(timezone.utc).replace(tzinfo=None)
 
             log_entry = LogEntry(
                 timestamp=db_timestamp,
@@ -113,7 +114,7 @@ def ingest_csv_logs(file_path: str, filename: str, db: Session) -> IngestionSumm
                 is_valid=is_valid,
                 validation_error=err_msg
             )
-            db.add(log_entry)
+            log_entries.append(log_entry)
 
             if is_valid:
                 loaded_rows += 1
@@ -125,6 +126,7 @@ def ingest_csv_logs(file_path: str, filename: str, db: Session) -> IngestionSumm
                     "error": err_msg
                 })
 
+        db.add_all(log_entries)
         db.commit()
 
         # Save IngestionSummary
@@ -140,3 +142,4 @@ def ingest_csv_logs(file_path: str, filename: str, db: Session) -> IngestionSumm
         db.refresh(summary)
 
         return summary
+

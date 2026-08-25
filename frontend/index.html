@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Log Analyzer & Anomaly Detector</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Navbar Header -->
+    <header class="navbar">
+      <div class="brand-header">
+        <div class="brand-icon">🛡️</div>
+        <div class="brand-title">
+          <h1>Smart Log Analyzer & Anomaly Detector</h1>
+          <p>Automated log ingestion, multi-rule anomaly detection, and Gemini AI root-cause analysis</p>
+        </div>
+      </div>
+      <div class="status-badge">
+        <div class="status-dot"></div>
+        <span>System Operational</span>
+      </div>
+    </header>
+
+    <!-- Toolbar & Ingestion Actions -->
+    <section class="toolbar-card">
+      <div class="action-group">
+        <label class="btn file-upload-btn">
+          🚀 Upload Log CSV
+          <input type="file" id="csvFileInput" accept=".csv" />
+        </label>
+        
+        <button class="btn btn-secondary" id="btnLoadDefault">
+          ⚙️ Load Default logs.csv
+        </button>
+        
+        <button class="btn" id="btnAnalyzeAll">
+          🤖 Batch AI Analyze Anomalies
+        </button>
+      </div>
+
+      <div class="action-group">
+        <button class="btn btn-danger" id="btnClearDb">
+          🗑️ Clear Database
+        </button>
+      </div>
+    </section>
+
+    <!-- Metrics Summary Cards -->
+    <section class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">Total Logs Processed</div>
+        <div class="metric-value" id="metricTotalLogs">0</div>
+      </div>
+      
+      <div class="metric-card valid">
+        <div class="metric-label">Valid Log Entries</div>
+        <div class="metric-value" id="metricValidLogs">0</div>
+      </div>
+
+      <div class="metric-card invalid">
+        <div class="metric-label">Malformed / Rejected</div>
+        <div class="metric-value" id="metricInvalidLogs">0</div>
+      </div>
+
+      <div class="metric-card anomaly">
+        <div class="metric-label">Flagged Anomalies</div>
+        <div class="metric-value" id="metricFlaggedAnomalies">0</div>
+      </div>
+    </section>
+
+    <!-- Summary Details Banner -->
+    <section id="summaryBanner" class="summary-alert" style="display: none;">
+      <div id="summaryBannerText">Loading summary details...</div>
+    </section>
+
+    <!-- Search & Filter Controls -->
+    <section class="filter-bar">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="Search log messages, IP source, or event type..." />
+      </div>
+
+      <div class="filter-chips">
+        <span class="chip active" data-status="ALL">All Logs</span>
+        <span class="chip" data-status="🚨 ANOMALY">🚨 Anomalies Only</span>
+        <span class="chip" data-status="✅ NORMAL">✅ Normal Logs</span>
+        <span class="chip" data-status="❌ INVALID">❌ Malformed Logs</span>
+      </div>
+    </section>
+
+    <!-- Logs Table Container -->
+    <main class="table-container">
+      <div class="table-header-bar">
+        <h2 class="table-title">📋 Logs Dataset Timeline & AI Anomaly Inspection</h2>
+        <div class="mono" id="tableCountIndicator">Showing 0 entries</div>
+      </div>
+
+      <div class="logs-table-wrapper">
+        <table class="logs-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Timestamp</th>
+              <th>Source</th>
+              <th>Event Type</th>
+              <th>Severity</th>
+              <th>Status</th>
+              <th>Detector Rule</th>
+              <th>Anomaly Reason</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="logsTableBody">
+            <tr>
+              <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 40px;">
+                No log entries ingested yet. Click "Load Default logs.csv" or upload a file above to begin.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Inspection Modal Drawer -->
+  <div class="modal-backdrop" id="inspectionModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalTitle">📌 Anomaly Detailed Inspection</h3>
+        <button class="modal-close" id="btnModalClose">&times;</button>
+      </div>
+      
+      <div class="modal-grid">
+        <!-- Event Metadata Panel -->
+        <div class="info-panel">
+          <h4>📝 Event Metadata</h4>
+          <div class="info-row"><span class="info-key">Log ID:</span><span class="info-val mono" id="modalLogId">-</span></div>
+          <div class="info-row"><span class="info-key">Timestamp:</span><span class="info-val mono" id="modalTimestamp">-</span></div>
+          <div class="info-row"><span class="info-key">Source IP / Host:</span><span class="info-val mono" id="modalSource">-</span></div>
+          <div class="info-row"><span class="info-key">Event Type:</span><span class="info-val" id="modalEventType">-</span></div>
+          <div class="info-row"><span class="info-key">Severity Level:</span><span class="info-val" id="modalSeverity">-</span></div>
+          <div class="info-row"><span class="info-key">Triggered Rule:</span><span class="info-val" id="modalRule">-</span></div>
+          <div class="info-row"><span class="info-key">Anomaly Score:</span><span class="info-val mono" id="modalScore">-</span></div>
+          <div class="info-row" style="flex-direction: column; gap: 4px; margin-top: 8px;">
+            <span class="info-key">Detector Reason:</span>
+            <span class="info-val" id="modalReason" style="font-size: 12px; color: #fca5a5;">-</span>
+          </div>
+        </div>
+
+        <!-- AI Diagnosis & Root Cause Panel -->
+        <div>
+          <h4 style="font-family: var(--font-heading); font-size: 15px; margin-bottom: 12px;">🤖 Gemini AI Intelligence</h4>
+          <div class="ai-box explanation">
+            <strong>Plain-English Explanation:</strong>
+            <p id="modalAiExplanation" style="margin-top: 6px;">Loading Gemini AI response...</p>
+          </div>
+
+          <div class="ai-box rootcause">
+            <strong>Root Cause & Recommended Action:</strong>
+            <p id="modalAiRootCause" style="margin-top: 6px;">Loading Gemini AI root cause...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
